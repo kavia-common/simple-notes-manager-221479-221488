@@ -1,0 +1,486 @@
+---
+import type { Note } from '../lib/notesService';
+---
+
+<section class="app">
+  <header class="app-header">
+    <div class="brand">
+      <div class="logo">🗒️</div>
+      <div class="titles">
+        <h1>Ocean Notes</h1>
+        <p class="subtitle">Capture ideas with clarity</p>
+      </div>
+    </div>
+    <button id="addBtn" class="btn primary">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      New Note
+    </button>
+  </header>
+
+  <main>
+    <div id="emptyState" class="empty hidden">
+      <div class="empty-card">
+        <h2>No notes yet</h2>
+        <p>Click "New Note" to create your first note.</p>
+      </div>
+    </div>
+    <ul id="notesList" class="notes-grid"></ul>
+  </main>
+
+  <dialog id="noteModal" class="modal">
+    <form method="dialog" id="noteForm" class="modal-content" novalidate>
+      <div class="modal-header">
+        <h3 id="modalTitle">New Note</h3>
+        <button type="button" class="icon-btn" id="closeModal" aria-label="Close">
+          ✕
+        </button>
+      </div>
+
+      <div class="field">
+        <label for="title">Title <span class="req">*</span></label>
+        <input id="title" name="title" type="text" placeholder="Note title" required maxlength="120" />
+        <div id="titleError" class="error-text" role="alert"></div>
+      </div>
+
+      <div class="field">
+        <label for="content">Content</label>
+        <textarea id="content" name="content" rows="8" placeholder="Write your thoughts..." ></textarea>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn ghost" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn primary" id="saveBtn">Save</button>
+      </div>
+      <input type="hidden" id="noteId" />
+    </form>
+  </dialog>
+
+  <dialog id="confirmDialog" class="confirm">
+    <form method="dialog" class="confirm-content">
+      <h4>Delete note?</h4>
+      <p>This action cannot be undone.</p>
+      <div class="actions">
+        <button value="cancel" class="btn ghost">Cancel</button>
+        <button value="confirm" class="btn danger">Delete</button>
+      </div>
+    </form>
+  </dialog>
+</section>
+
+<style>
+  :root {
+    --primary: #2563EB;
+    --accent: #F59E0B;
+    --success: #F59E0B;
+    --error: #EF4444;
+    --bg: #f9fafb;
+    --surface: #ffffff;
+    --text: #111827;
+    --muted: #6b7280;
+    --ring: rgba(37, 99, 235, 0.35);
+    --border: rgba(17, 24, 39, 0.1);
+    --shadow: 0 6px 20px rgba(17, 24, 39, 0.08);
+  }
+
+  .app {
+    min-height: 100vh;
+    background:
+      radial-gradient(1000px 300px at -10% -10%, rgba(37,99,235,0.08), transparent 60%),
+      radial-gradient(1000px 300px at 110% -20%, rgba(14,165,233,0.08), transparent 60%),
+      var(--bg);
+    padding-bottom: 40px;
+  }
+
+  .app-header {
+    position: sticky;
+    top: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px;
+    z-index: 10;
+  }
+
+  .brand {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(37,99,235,0.15), rgba(249,250,251,0.9));
+    display: grid;
+    place-items: center;
+    box-shadow: var(--shadow);
+  }
+
+  h1 {
+    font-size: 1.3rem;
+    margin: 0;
+    color: var(--text);
+  }
+
+  .subtitle {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  main {
+    max-width: 1100px;
+    margin: 20px auto 0;
+    padding: 0 16px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 10px;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    transition: all .2s ease;
+    cursor: pointer;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(17,24,39,0.12); }
+  .btn:focus { outline: 3px solid var(--ring); outline-offset: 2px; }
+  .btn.primary {
+    background: linear-gradient(180deg, #2563EB, #1d4ed8);
+    color: #ffffff;
+    border: none;
+  }
+  .btn.ghost { background: transparent; }
+  .btn.danger {
+    background: linear-gradient(180deg, #EF4444, #dc2626);
+    border: none;
+    color: #fff;
+  }
+
+  .empty { display: grid; place-items: center; }
+  .empty.hidden { display: none; }
+  .empty-card {
+    margin-top: 60px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+    text-align: center;
+  }
+
+  .notes-grid {
+    list-style: none;
+    margin: 0;
+    padding: 10px 0 30px;
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 14px;
+  }
+  @media (min-width: 640px) { .notes-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 1024px) { .notes-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 34px rgba(17,24,39,0.12);
+    border-color: rgba(37, 99, 235, 0.25);
+  }
+  .card-title {
+    margin: 0;
+    font-weight: 600;
+    color: var(--text);
+    font-size: 1rem;
+  }
+  .card-meta {
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+  .card-content {
+    color: #374151;
+    font-size: 0.9rem;
+    line-height: 1.35rem;
+    white-space: pre-wrap;
+  }
+  .card-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 6px;
+  }
+  .icon-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all .15s ease;
+  }
+  .icon-btn:hover {
+    border-color: rgba(37,99,235,0.35);
+    box-shadow: 0 8px 18px rgba(17,24,39,0.08);
+  }
+
+  .modal, .confirm {
+    border: none;
+    padding: 0;
+    border-radius: 16px;
+    width: min(600px, 92vw);
+    box-shadow: 0 24px 60px rgba(17,24,39,0.25);
+  }
+  .modal[open]::backdrop,
+  .confirm[open]::backdrop {
+    background: rgba(17,24,39,0.35);
+    backdrop-filter: blur(2px);
+  }
+  .modal-content {
+    background: var(--surface);
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+  .confirm-content {
+    background: var(--surface);
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .field { margin: 10px 0; display: flex; flex-direction: column; gap: 6px; }
+  label { color: var(--text); font-size: 0.9rem; }
+  .req { color: var(--error); }
+  input[type="text"], textarea {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 0.95rem;
+    background: #fff;
+    color: var(--text);
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  input[type="text"]:focus, textarea:focus {
+    outline: none;
+    border-color: rgba(37,99,235,0.45);
+    box-shadow: 0 0 0 4px var(--ring);
+  }
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .error-text {
+    color: var(--error);
+    font-size: 0.8rem;
+    min-height: 1.1em;
+  }
+</style>
+
+<script>
+  import { listNotes, createNote, updateNote, deleteNote } from '../lib/notesService';
+
+  let currentNotes = [];
+  let editingId = '';
+
+  function $(sel) { return document.querySelector(sel); }
+  function formatTime(iso) {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString();
+    } catch {
+      return iso;
+    }
+  }
+  function preview(text, max = 140) {
+    const t = (text || '').replace(/\s+/g, ' ').trim();
+    return t.length > max ? (t.slice(0, max) + '…') : t;
+  }
+  function render() {
+    const list = $('#notesList');
+    const empty = $('#emptyState');
+    if (!list || !empty) return;
+
+    list.innerHTML = '';
+    if (!currentNotes.length) {
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+
+    for (const n of currentNotes) {
+      const li = document.createElement('li');
+      li.className = 'card';
+      li.innerHTML = `
+        <h4 class="card-title">${escapeHtml(n.title)}</h4>
+        <div class="card-meta">Updated ${escapeHtml(formatTime(n.updatedAt))}</div>
+        <div class="card-content">${escapeHtml(preview(n.content))}</div>
+        <div class="card-actions">
+          <button class="icon-btn" data-act="edit" data-id="${n.id}">Edit</button>
+          <button class="icon-btn" data-act="delete" data-id="${n.id}">Delete</button>
+        </div>
+      `;
+      list.appendChild(li);
+    }
+  }
+  function escapeHtml(str='') {
+    return String(str)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  async function refresh() {
+    try {
+      currentNotes = await listNotes();
+    } catch (e) {
+      console.error('Failed to load notes:', e);
+      currentNotes = [];
+    }
+    render();
+  }
+
+  function openModal(mode, note) {
+    const dlg = $('#noteModal');
+    const titleEl = $('#title');
+    const contentEl = $('#content');
+    const idEl = $('#noteId');
+    const title = $('#modalTitle');
+    const err = $('#titleError');
+
+    if (!dlg || !titleEl || !contentEl || !idEl || !title || !err) return;
+
+    err.textContent = '';
+    if (mode === 'edit' && note) {
+      title.textContent = 'Edit Note';
+      titleEl.value = note.title || '';
+      contentEl.value = note.content || '';
+      idEl.value = note.id || '';
+      editingId = note.id;
+    } else {
+      title.textContent = 'New Note';
+      titleEl.value = '';
+      contentEl.value = '';
+      idEl.value = '';
+      editingId = '';
+    }
+    dlg.showModal();
+    setTimeout(() => titleEl.focus(), 10);
+  }
+
+  function closeModal() {
+    const dlg = $('#noteModal');
+    const err = $('#titleError');
+    if (err) err.textContent = '';
+    if (dlg) dlg.close();
+    editingId = '';
+  }
+
+  async function handleSubmit(ev) {
+    ev.preventDefault();
+    const t = $('#title');
+    const c = $('#content');
+    const err = $('#titleError');
+    if (!t || !c || !err) return;
+
+    const title = (t.value || '').trim();
+    const content = c.value || '';
+    if (!title) {
+      err.textContent = 'Title is required.';
+      t.focus();
+      return;
+    }
+    try {
+      if (editingId) {
+        await updateNote(editingId, { title, content });
+      } else {
+        await createNote({ title, content });
+      }
+      closeModal();
+      await refresh();
+    } catch (e) {
+      console.error('Save failed:', e);
+      err.textContent = 'Could not save. Please try again.';
+    }
+  }
+
+  async function askDelete(id) {
+    const dlg = $('#confirmDialog');
+    if (!dlg) return;
+    const result = await new Promise((resolve) => {
+      dlg.addEventListener('close', function onClose() {
+        dlg.removeEventListener('close', onClose);
+        resolve(dlg.returnValue);
+      });
+      dlg.showModal();
+    });
+    if (result === 'confirm') {
+      try {
+        await deleteNote(id);
+        await refresh();
+      } catch (e) {
+        console.error('Delete failed:', e);
+        alert('Failed to delete note. Please try again.');
+      }
+    }
+  }
+
+  function attachEvents() {
+    const add = $('#addBtn');
+    const list = $('#notesList');
+    const form = $('#noteForm');
+    const cancel = $('#cancelBtn');
+    const closeX = $('#closeModal');
+
+    add?.addEventListener('click', () => openModal('create'));
+    cancel?.addEventListener('click', () => closeModal());
+    closeX?.addEventListener('click', () => closeModal());
+    form?.addEventListener('submit', handleSubmit);
+
+    list?.addEventListener('click', (e) => {
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+      const act = target.dataset.act;
+      const id = target.dataset.id;
+      if (!act || !id) return;
+      if (act === 'edit') {
+        const note = currentNotes.find((n) => n.id === id);
+        if (note) openModal('edit', note);
+      } else if (act === 'delete') {
+        askDelete(id);
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { attachEvents(); refresh(); });
+  } else {
+    attachEvents();
+    refresh();
+  }
+</script>
